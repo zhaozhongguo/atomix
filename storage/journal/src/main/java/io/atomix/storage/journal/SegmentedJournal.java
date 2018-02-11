@@ -55,7 +55,6 @@ public class SegmentedJournal<E> implements Journal<E> {
     return new Builder<>();
   }
 
-  private static final int DEFAULT_BUFFER_SIZE = 1024 * 64;
   private static final int SEGMENT_BUFFER_FACTOR = 3;
 
   private final Logger log = LoggerFactory.getLogger(getClass());
@@ -379,7 +378,7 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> createDiskSegment(JournalSegmentDescriptor descriptor) {
     File segmentFile = JournalSegmentFile.createSegmentFile(name, directory, descriptor.id());
-    Buffer buffer = FileBuffer.allocate(segmentFile, Math.min(DEFAULT_BUFFER_SIZE, descriptor.maxSegmentSize()), Integer.MAX_VALUE);
+    Buffer buffer = FileBuffer.allocate(segmentFile, descriptor.maxSegmentSize(), descriptor.maxSegmentSize()).zero();
     descriptor.copyTo(buffer);
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(segmentFile), descriptor);
     log.debug("Created disk segment: {}", segment);
@@ -391,7 +390,7 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> createMappedSegment(JournalSegmentDescriptor descriptor) {
     File segmentFile = JournalSegmentFile.createSegmentFile(name, directory, descriptor.id());
-    Buffer buffer = MappedBuffer.allocate(segmentFile, Math.min(DEFAULT_BUFFER_SIZE, descriptor.maxSegmentSize()), Integer.MAX_VALUE);
+    Buffer buffer = MappedBuffer.allocate(segmentFile, descriptor.maxSegmentSize(), descriptor.maxSegmentSize()).zero();
     descriptor.copyTo(buffer);
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(segmentFile), descriptor);
     log.debug("Created memory mapped segment: {}", segment);
@@ -403,7 +402,7 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> createMemorySegment(JournalSegmentDescriptor descriptor) {
     File segmentFile = JournalSegmentFile.createSegmentFile(name, directory, descriptor.id());
-    Buffer buffer = HeapBuffer.allocate(Math.min(DEFAULT_BUFFER_SIZE, descriptor.maxSegmentSize()), Integer.MAX_VALUE);
+    Buffer buffer = HeapBuffer.allocate(descriptor.maxSegmentSize(), descriptor.maxSegmentSize());
     descriptor.copyTo(buffer);
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(segmentFile), descriptor);
     log.debug("Created memory segment: {}", segment);
@@ -431,8 +430,9 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> loadDiskSegment(long segmentId) {
     File file = JournalSegmentFile.createSegmentFile(name, directory, segmentId);
-    Buffer buffer = FileBuffer.allocate(file, Math.min(DEFAULT_BUFFER_SIZE, maxSegmentSize), Integer.MAX_VALUE);
+    Buffer buffer = FileBuffer.allocate(file, maxSegmentSize, Integer.MAX_VALUE);
     JournalSegmentDescriptor descriptor = new JournalSegmentDescriptor(buffer);
+    buffer.limit(descriptor.maxSegmentSize());
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(file), descriptor);
     log.debug("Loaded disk segment: {} ({})", descriptor.id(), file.getName());
     return segment;
@@ -443,8 +443,9 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> loadMappedSegment(long segmentId) {
     File file = JournalSegmentFile.createSegmentFile(name, directory, segmentId);
-    Buffer buffer = MappedBuffer.allocate(file, Math.min(DEFAULT_BUFFER_SIZE, maxSegmentSize), Integer.MAX_VALUE);
+    Buffer buffer = MappedBuffer.allocate(file, maxSegmentSize, Integer.MAX_VALUE);
     JournalSegmentDescriptor descriptor = new JournalSegmentDescriptor(buffer);
+    buffer.limit(descriptor.maxSegmentSize());
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(file), descriptor);
     log.debug("Loaded disk segment: {} ({})", descriptor.id(), file.getName());
     return segment;
@@ -455,8 +456,9 @@ public class SegmentedJournal<E> implements Journal<E> {
    */
   private JournalSegment<E> loadMemorySegment(long segmentId) {
     File file = JournalSegmentFile.createSegmentFile(name, directory, segmentId);
-    Buffer buffer = HeapBuffer.allocate(Math.min(DEFAULT_BUFFER_SIZE, maxSegmentSize), Integer.MAX_VALUE);
+    Buffer buffer = HeapBuffer.allocate(maxSegmentSize, Integer.MAX_VALUE);
     JournalSegmentDescriptor descriptor = new JournalSegmentDescriptor(buffer);
+    buffer.limit(descriptor.maxSegmentSize());
     JournalSegment<E> segment = newSegment(new JournalSegmentFile(file), descriptor);
     log.debug("Loaded memory segment: {}", descriptor.id());
     return segment;

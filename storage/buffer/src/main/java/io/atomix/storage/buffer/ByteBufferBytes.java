@@ -24,6 +24,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Byte buffer bytes.
  */
 public abstract class ByteBufferBytes extends AbstractBytes {
+  private static final int PAGE_SIZE = 1024 * 4;
+  private static final byte[] BLANK_PAGE = new byte[PAGE_SIZE];
+
   protected ByteBuffer buffer;
 
   protected ByteBufferBytes(ByteBuffer buffer) {
@@ -70,11 +73,6 @@ public abstract class ByteBufferBytes extends AbstractBytes {
   }
 
   @Override
-  public Bytes zero() {
-    return this;
-  }
-
-  @Override
   public int size() {
     return buffer.capacity();
   }
@@ -94,6 +92,11 @@ public abstract class ByteBufferBytes extends AbstractBytes {
    */
   private int index(int offset) {
     return (int) offset;
+  }
+
+  @Override
+  public Bytes zero() {
+    return zero(0);
   }
 
   @Override
