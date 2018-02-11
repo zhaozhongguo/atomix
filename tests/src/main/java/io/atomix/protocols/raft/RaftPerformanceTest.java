@@ -123,12 +123,18 @@ public class RaftPerformanceTest implements Runnable {
 
   private static final int ITERATIONS = 1;
 
-  private static final int TOTAL_OPERATIONS = 1000000;
+  private static final int TOTAL_OPERATIONS = 100000;
   private static final int WRITE_RATIO = 10;
   private static final int NUM_CLIENTS = 5;
 
+  // Client options
   private static final ReadConsistency READ_CONSISTENCY = ReadConsistency.LINEARIZABLE;
   private static final CommunicationStrategy COMMUNICATION_STRATEGY = CommunicationStrategy.ANY;
+
+  // Server options
+  private static final StorageLevel STORAGE_LEVEL = StorageLevel.DISK;
+  private static final boolean FLUSH_ON_COMMIT = true;
+  private static final int MAX_SEGMENT_SIZE = 1024 * 1024 * 64;
 
   /**
    * Runs the test.
@@ -457,13 +463,13 @@ public class RaftPerformanceTest implements Runnable {
 
     RaftServer.Builder builder = RaftServer.newBuilder(memberId)
         .withProtocol(protocol)
-        .withThreadModel(ThreadModel.THREAD_PER_SERVICE)
+        .withThreadModel(ThreadModel.SHARED_THREAD_POOL)
         .withStorage(RaftStorage.newBuilder()
-            .withStorageLevel(StorageLevel.MAPPED)
+            .withStorageLevel(STORAGE_LEVEL)
             .withDirectory(new File(String.format("target/perf-logs/%s", memberId)))
+            .withFlushOnCommit(FLUSH_ON_COMMIT)
             .withSerializer(storageSerializer)
-            .withMaxEntriesPerSegment(32768)
-            .withMaxSegmentSize(1024 * 1024)
+            .withMaxSegmentSize(MAX_SEGMENT_SIZE)
             .build())
         .addService("test", PerformanceStateMachine::new);
 
