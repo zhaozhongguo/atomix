@@ -27,11 +27,14 @@ import static com.google.common.base.Preconditions.checkState;
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
 public class JournalSegment<E> implements AutoCloseable {
+  private static final int ENTRY_CACHE_SIZE = 1024;
+
   protected final JournalSegmentFile file;
   protected final JournalSegmentDescriptor descriptor;
   protected final JournalIndex index;
   protected final Serializer serializer;
   private final JournalSegmentWriter<E> writer;
+  private final JournalSegmentCache cache;
   private boolean open = true;
 
   public JournalSegment(JournalSegmentFile file, JournalSegmentDescriptor descriptor, JournalIndex index, Serializer serializer) {
@@ -39,7 +42,8 @@ public class JournalSegment<E> implements AutoCloseable {
     this.descriptor = descriptor;
     this.index = index;
     this.serializer = serializer;
-    this.writer = new JournalSegmentWriter<>(descriptor, index, serializer);
+    this.cache = new JournalSegmentCache(descriptor.index(), ENTRY_CACHE_SIZE);
+    this.writer = new JournalSegmentWriter<>(descriptor, cache, index, serializer);
   }
 
   /**
@@ -149,7 +153,7 @@ public class JournalSegment<E> implements AutoCloseable {
    */
   JournalSegmentReader<E> createReader() {
     checkOpen();
-    return new JournalSegmentReader<>(descriptor, index, serializer);
+    return new JournalSegmentReader<>(descriptor, cache, index, serializer);
   }
 
   /**

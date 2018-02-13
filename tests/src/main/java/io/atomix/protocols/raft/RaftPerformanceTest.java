@@ -123,7 +123,7 @@ public class RaftPerformanceTest implements Runnable {
 
   private static final int ITERATIONS = 1;
 
-  private static final int TOTAL_OPERATIONS = 100000;
+  private static final int TOTAL_OPERATIONS = 1000000;
   private static final int WRITE_RATIO = 10;
   private static final int NUM_CLIENTS = 5;
 
@@ -133,7 +133,7 @@ public class RaftPerformanceTest implements Runnable {
 
   // Server options
   private static final StorageLevel STORAGE_LEVEL = StorageLevel.DISK;
-  private static final boolean FLUSH_ON_COMMIT = true;
+  private static final boolean FLUSH_ON_COMMIT = false;
   private static final int MAX_SEGMENT_SIZE = 1024 * 1024 * 64;
 
   /**
