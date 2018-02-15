@@ -27,7 +27,6 @@ import io.atomix.protocols.raft.session.RaftSessionListener;
 import io.atomix.protocols.raft.session.SessionId;
 import io.atomix.protocols.raft.session.impl.RaftSessionContext;
 import io.atomix.protocols.raft.session.impl.RaftSessionRegistry;
-import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.junit.Test;
 
@@ -81,7 +80,6 @@ public class DefaultServiceSessionsTest {
     when(context.serviceType()).thenReturn(ServiceType.from("test"));
     when(context.serviceName()).thenReturn("test");
     when(context.serviceId()).thenReturn(ServiceId.from(1));
-    when(context.executor()).thenReturn(mock(ThreadContext.class));
 
     RaftContext server = mock(RaftContext.class);
     when(server.getProtocol()).thenReturn(mock(RaftServerProtocol.class));
