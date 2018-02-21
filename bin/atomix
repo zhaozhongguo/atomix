@@ -13,6 +13,10 @@ case "$command" in
     shift
     java -jar ${ATOMIX_ROOT}/agent/target/atomix-agent.jar "$@"
     ;;
+"test")
+    shift
+    python ${ATOMIX_ROOT}/tools/test/main.py "$@"
+    ;;
 *)
     python ${ATOMIX_ROOT}/cli/main.py "$@"
 esac

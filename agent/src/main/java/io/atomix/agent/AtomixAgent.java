@@ -63,9 +63,9 @@ public class AtomixAgent {
       }
     };
 
-    ArgumentParser parser = ArgumentParsers.newArgumentParser("AtomixServer")
+    ArgumentParser parser = ArgumentParsers.newArgumentParser("AtomixAgent")
         .defaultHelp(true)
-        .description("Atomix server");
+        .description("Atomix agent");
     parser.addArgument("node")
         .type(nodeType)
         .nargs("?")
