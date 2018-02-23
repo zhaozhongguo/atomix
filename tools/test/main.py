@@ -1,4 +1,4 @@
-from cluster import Cluster, set_cluster
+from cluster import get_cluster, set_cluster, Cluster
 from test import Test
 from errors import TestError
 import sys
@@ -17,7 +17,18 @@ def run():
     setup_parser.add_argument('--gateway', '-g', default=None, help="The IPv4 gateway for the master subnet")
 
     teardown_parser = subparsers.add_parser('teardown', help="Tear down a test cluster")
-    teardown_parser.add_argument('name', help="The cluster name")
+    teardown_parser.add_argument('name', nargs='?', help="The cluster name")
+
+    add_node_parser = subparsers.add_parser('add-node', help="Add a node to a test cluster")
+    add_node_parser.add_argument('cluster', nargs='?', help="The cluster to which to add the node")
+    add_node_parser.add_argument('--type', '-t', choices=['server', 'client'], default='server', help="The type of node to add")
+
+    remove_node_parser = subparsers.add_parser('remove-node', help="Remove a node from a test cluster")
+    remove_node_parser.add_argument('node', help="The node to remove from the cluster")
+    remove_node_parser.add_argument('--cluster', '-c', help="The cluster from which to remove the node")
+
+    cluster_parser = subparsers.add_parser('cluster-info', help="Get information about a test cluster")
+    cluster_parser.add_argument('cluster', nargs='?', help="The cluster for which to get information")
 
     run_parser = subparsers.add_parser('run', help="Run a test")
     run_parser.add_argument('test', help="The test to run")
@@ -29,9 +40,15 @@ def run():
         if args.action == 'setup':
             Cluster(args.name).setup(args.nodes, args.subnet)
         elif args.action == 'teardown':
-            cluster = Cluster(args.name)
+            cluster = get_cluster(args.name)
             cluster.teardown()
             cluster.cleanup()
+        elif args.action == 'add-node':
+            get_cluster(args.cluster).add_node(args.type)
+        elif args.action == 'remove-node':
+            get_cluster(args.cluster).remove_node(args.node)
+        elif args.action == 'cluster-info':
+            print get_cluster(args.cluster)
         elif args.action == 'run':
             set_cluster(args.cluster)
             try:

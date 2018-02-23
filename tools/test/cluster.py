@@ -1,8 +1,7 @@
 from network import Network
 from client import AtomixClient
 from logger import Logger
-from errors import UnknownNetworkError, UnknownNodeError
-from ipaddress import IPv4Network
+from errors import UnknownClusterError, UnknownNetworkError, UnknownNodeError
 from six.moves import shlex_quote
 import shutil
 import os
@@ -33,33 +32,55 @@ class Cluster(object):
             return [node for node in self.nodes if node.name == id].pop()
 
     @property
-    def nodes(self):
+    def nodes(self, type=None):
         """Returns a list of nodes in the cluster."""
         # Sort the containers by name and then extract the IP address from the container info.
-        containers = sorted(self._docker_client.containers.list(all=True, filters={'label': 'cluster={}'.format(self.name)}), key=lambda c: c.name)
-        return [Node(c.name, self._docker_api_client.inspect_container(c.name)['NetworkSettings']['Networks'][self.network.name]['IPAddress'], self) for c in containers]
+        if type is not None:
+            labels = ['atomix-test=true', 'atomix-cluster={}'.format(self.name), 'atomix-type={}'.format(type)]
+        else:
+            labels = ['atomix-test=true', 'atomix-cluster={}'.format(self.name),]
+        containers = sorted(self._docker_client.containers.list(all=True, filters={'label': labels}), key=lambda c: c.name)
+        nodes = []
+        for container in containers:
+            container_info = self._docker_api_client.inspect_container(container.name)
+            nodes.append(Node(container.name, container_info['NetworkSettings']['Networks'][self.network.name]['IPAddress'], container_info['Config']['Labels']['atomix-type'], self))
+        return nodes
+
+    @property
+    def servers(self):
+        return self.nodes(Node.Type.SERVER)
+
+    @property
+    def clients(self):
+        return self.nodes(Node.Type.CLIENT)
+
+    def _node_name(self, id):
+        return '{}-{}'.format(self.name, id)
 
     def setup(self, nodes=3, subnet='172.18.0.0/16', gateway=None):
         """Sets up the cluster."""
-        self.log.message("Setting up cluster", self.name)
-
-        # Create an IPv4 network from which to determine hosts.
-        hosts = IPv4Network(unicode(subnet)).hosts()
-
-        # If the gateway is not configured then set it from hosts.
-        if gateway is None:
-            gateway = str(next(hosts))
+        self.log.message("Setting up cluster")
 
         # Set up the test network.
         self.network.setup(subnet, gateway)
 
         # Iterate through nodes and setup containers.
         for n in range(1, nodes + 1):
-            Node('%s-%d' % (self.name, n), str(next(hosts)), self).setup()
+            Node(self._node_name(n), next(self.network.hosts), Node.Type.SERVER, self).setup()
+
+    def add_node(self, type='server'):
+        """Adds a new node to the cluster."""
+        self.log.message("Adding a node to the cluster")
+        Node(self._node_name(len(self.nodes)+1), next(self.network.hosts), type, self).setup()
+
+    def remove_node(self, id):
+        """Removes a node from the cluster."""
+        self.log.message("Removing a node from the cluster")
+        self.node(id).teardown()
 
     def teardown(self):
         """Tears down the cluster."""
-        self.log.message("Tearing down cluster", self.name)
+        self.log.message("Tearing down cluster")
         for node in self.nodes:
             try:
                 node.teardown()
@@ -72,17 +93,38 @@ class Cluster(object):
 
     def cleanup(self):
         """Cleans up the cluster data."""
-        self.log.message("Cleaning up cluster state", self.name)
+        self.log.message("Cleaning up cluster state")
         if os.path.exists(self.path):
             shutil.rmtree(self.path)
+
+    def __str__(self):
+        lines = []
+        lines.append('name: {}'.format(self.name))
+        lines.append('network:')
+        lines.append('  name: {}'.format(self.network.name))
+        lines.append('  subnet: {}'.format(self.network.subnet))
+        lines.append('  gateway: {}'.format(self.network.gateway))
+        lines.append('nodes:')
+        for node in self.nodes:
+            lines.append('  {}:'.format(node.name))
+            lines.append('    state: {}'.format(node.docker_container.status))
+            lines.append('    type: {}'.format(node.type))
+            lines.append('    ip: {}'.format(node.ip))
+            lines.append('    host port: {}'.format(node.local_port))
+        return '\n'.join(lines)
 
 
 class Node(object):
     """Atomix test node."""
-    def __init__(self, name, ip, cluster):
+    class Type(object):
+        SERVER = 'server'
+        CLIENT = 'client'
+
+    def __init__(self, name, ip, type, cluster):
         self.log = Logger(cluster.name, Logger.Type.FRAMEWORK)
         self.name = name
         self.ip = ip
+        self.type = type
         self.http_port = 5678
         self.tcp_port = 5679
         self.cluster = cluster
@@ -124,7 +166,7 @@ class Node(object):
             'atomix',
             ' '.join(args),
             name=self.name,
-            labels={'cluster': self.cluster.name},
+            labels={'atomix-test': 'true', 'atomix-cluster': self.cluster.name, 'atomix-type': self.type},
             network=self.cluster.network.name,
             ports={self.http_port: self._find_open_port()},
             detach=True,
@@ -133,7 +175,7 @@ class Node(object):
     def run(self, *command):
         """Runs the given command in the container."""
         command = ' '.join([shlex_quote(arg) for arg in command])
-        self.log.message("Executing command: {}", self.name, command)
+        self.log.message("Executing command '{}' on {}", command, self.name)
         return self.docker_container.exec_run(command)
 
     def stop(self):
@@ -213,11 +255,29 @@ class Node(object):
         """Waits for the node to exit."""
         self.docker_container.wait()
 
-cluster = Cluster('default')
+cluster = None
 
 def set_cluster(name):
     global cluster
-    cluster = Cluster(name)
+    cluster = get_cluster(name)
+
+def _find_cluster():
+    docker_client = docker.from_env()
+    docker_api_client = APIClient(kwargs_from_env())
+    containers = docker_client.containers.list(filters={'label': 'atomix-test=true'})
+    if len(containers) > 0:
+        container = containers[0]
+        cluster_name = docker_api_client.inspect_container(container.name)['Config']['Labels']['atomix-cluster']
+        return Cluster(cluster_name)
+    raise UnknownClusterError
+
+def get_cluster(name=None):
+    if name is not None:
+        return Cluster(name)
+    elif cluster is not None:
+        return cluster
+    else:
+        return _find_cluster()
 
 def node(id):
     return cluster.node(id)

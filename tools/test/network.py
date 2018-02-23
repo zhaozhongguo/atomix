@@ -1,6 +1,9 @@
 from logger import Logger
 from errors import UnknownNetworkError
+from ipaddress import IPv4Network
 import docker
+from docker.api.client import APIClient
+from docker.utils import kwargs_from_env
 
 class Network(object):
     """Atomix test network."""
@@ -8,6 +11,8 @@ class Network(object):
         self.log = Logger(name, Logger.Type.FRAMEWORK)
         self.name = name
         self._docker_client = docker.from_env()
+        self._docker_api_client = APIClient(kwargs_from_env())
+        self._hosts = None
 
     @property
     def docker_network(self):
@@ -16,8 +21,36 @@ class Network(object):
         except docker.errors.NotFound:
             raise UnknownNetworkError(self.name)
 
-    def setup(self, subnet, gateway):
+    @property
+    def subnet(self):
+        return self._docker_api_client.inspect_network(self.name)['IPAM']['Config'][0]['Subnet']
+
+    @property
+    def gateway(self):
+        return self._docker_api_client.inspect_network(self.name)['IPAM']['Config'][0]['Gateway']
+
+    @property
+    def hosts(self):
+        if self._hosts is None:
+            self._hosts = self._create_hosts_iterator()
+        return self._hosts
+
+    def _create_hosts_iterator(self):
+        """Creates a host iterator from available hosts by inspecting existing containers attached to the network."""
+        hosts = [str(host) for host in IPv4Network(unicode(self.subnet)).hosts()]
+        next_index = 0
+        if hosts[0] == self.gateway:
+            next_index += 1
+        ips = [container['IPv4Address'] for container in self._docker_api_client.inspect_network(self.name)['Containers'].values()]
+        available = [host for host in hosts if host not in ips]
+        return iter(available)
+
+    def setup(self, subnet='172.18.0.0/16', gateway=None):
         """Sets up the network."""
+        self._hosts = iter([str(host) for host in IPv4Network(unicode(subnet)).hosts()])
+        if gateway is None:
+            gateway = str(next(self._hosts))
+
         ipam_pool = docker.types.IPAMPool(
             subnet=subnet,
             gateway=gateway
