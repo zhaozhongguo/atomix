@@ -74,6 +74,7 @@ public class RaftServiceManager implements AutoCloseable {
   private static final Duration SNAPSHOT_INTERVAL = Duration.ofSeconds(10);
   private static final Duration SNAPSHOT_COMPLETION_DELAY = Duration.ofSeconds(10);
   private static final Duration COMPACT_DELAY = Duration.ofSeconds(10);
+  private static final int APPLY_BATCH_SIZE = 1024 * 32;
 
   private static final int SEGMENT_BUFFER_FACTOR = 5;
 
@@ -289,7 +290,7 @@ public class RaftServiceManager implements AutoCloseable {
   public void applyAll(long index) {
     // Don't attempt to apply indices that have already been applied.
     if (index > raft.getLastApplied()) {
-      raft.getThreadContext().execute(() -> applyNext(index));
+      raft.getThreadContext().execute(() -> applyBatch(index));
     }
   }
 
@@ -306,7 +307,7 @@ public class RaftServiceManager implements AutoCloseable {
   @SuppressWarnings("unchecked")
   public <T> CompletableFuture<T> apply(long index) {
     CompletableFuture<T> future = futures.computeIfAbsent(index, i -> new CompletableFuture<T>());
-    raft.getThreadContext().execute(() -> applyNext(index));
+    raft.getThreadContext().execute(() -> applyBatch(index));
     return future;
   }
 
@@ -316,9 +317,25 @@ public class RaftServiceManager implements AutoCloseable {
    * @param index the index up to which to apply the entry
    */
   @SuppressWarnings("unchecked")
-  private void applyNext(long index) {
-    // Apply entries prior to this entry.
-    if (reader.hasNext()) {
+  private void applyBatch(long index) {
+    // Track the number of bytes in entries applied to the state machine in this batch.
+    int batchSize = 0;
+
+    // Apply entries until the maximum batch size has been reached.
+    while (batchSize < APPLY_BATCH_SIZE) {
+      // If the next index is greater than the given index, just return.
+      if (reader.getNextIndex() > index) {
+        return;
+      }
+      // If the reader has no next entry, something went wrong with the log. Fail the future.
+      else if (!reader.hasNext()) {
+        CompletableFuture future = futures.remove(index);
+        if (future != null) {
+          logger.error("Cannot apply index " + index);
+          future.completeExceptionally(new IndexOutOfBoundsException("Cannot apply index " + index));
+        }
+      }
+
       long nextIndex = reader.getNextIndex();
 
       // Validate that the next entry can be applied.
@@ -342,6 +359,7 @@ public class RaftServiceManager implements AutoCloseable {
       // If the next index is less than or equal to the given index, read and apply the entry.
       if (nextIndex < index) {
         Indexed<RaftLogEntry> entry = reader.next();
+        batchSize += entry.size();
         try {
           apply(entry);
         } catch (Exception e) {
@@ -349,8 +367,6 @@ public class RaftServiceManager implements AutoCloseable {
         } finally {
           raft.setLastApplied(nextIndex);
         }
-        raft.getThreadContext().execute(() -> applyNext(index));
-        return;
       }
       // If the next index is equal to the applied index, apply it and return the result.
       else if (nextIndex == index) {
@@ -390,11 +406,9 @@ public class RaftServiceManager implements AutoCloseable {
       }
     }
 
-    CompletableFuture future = futures.remove(index);
-    if (future != null) {
-      logger.error("Cannot apply index " + index);
-      future.completeExceptionally(new IndexOutOfBoundsException("Cannot apply index " + index));
-    }
+    // If the loop has been exited without returning, that indicates there are more entries to be applied to
+    // reach the given index. Make an asynchronous recursive call to allow other enqueued operations to be performed.
+    raft.getThreadContext().execute(() -> applyBatch(index));
   }
 
   /**
