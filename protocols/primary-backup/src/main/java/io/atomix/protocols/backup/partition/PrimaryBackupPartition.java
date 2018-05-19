@@ -25,6 +25,7 @@ import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.protocols.backup.PrimaryBackupClient;
 import io.atomix.protocols.backup.partition.impl.PrimaryBackupPartitionClient;
 import io.atomix.protocols.backup.partition.impl.PrimaryBackupPartitionServer;
+import io.atomix.utils.concurrent.AtomixFuture;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 import java.util.Collection;
@@ -127,7 +128,7 @@ public class PrimaryBackupPartition implements Partition {
       return CompletableFuture.completedFuture(null);
     }
 
-    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture<Void> future = new AtomixFuture<>();
     client.stop().whenComplete((clientResult, clientError) -> {
       if (server != null) {
         server.stop().whenComplete((serverResult, serverError) -> {

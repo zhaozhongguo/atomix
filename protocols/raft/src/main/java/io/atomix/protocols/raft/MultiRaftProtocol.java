@@ -24,7 +24,6 @@ import io.atomix.primitive.proxy.PartitionProxy;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.proxy.impl.PartitionedPrimitiveProxy;
 import io.atomix.primitive.service.ServiceConfig;
-import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.protocols.raft.proxy.CommunicationStrategy;
 
 import java.time.Duration;
@@ -101,7 +100,6 @@ public class MultiRaftProtocol implements PrimitiveProtocol {
             .withRecoveryStrategy(config.getRecoveryStrategy())
             .withMaxRetries(config.getMaxRetries())
             .withRetryDelay(config.getRetryDelay())
-            .withExecutor(config.getExecutor())
             .build())
         .collect(Collectors.toList());
     return new PartitionedPrimitiveProxy(primitiveName, primitiveType, partitions, config.getPartitioner());
@@ -233,8 +231,8 @@ public class MultiRaftProtocol implements PrimitiveProtocol {
      * @return The proxy builder.
      * @throws NullPointerException if the executor is null
      */
+    @Deprecated
     public Builder withExecutor(Executor executor) {
-      config.setExecutor(executor);
       return this;
     }
 

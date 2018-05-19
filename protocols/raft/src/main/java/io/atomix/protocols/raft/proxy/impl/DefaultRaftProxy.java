@@ -123,6 +123,11 @@ public class DefaultRaftProxy implements RaftProxy {
   }
 
   @Override
+  public ThreadContext context() {
+    return context;
+  }
+
+  @Override
   public PartitionProxy.State getState() {
     return state.getState();
   }

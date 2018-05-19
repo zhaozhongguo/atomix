@@ -42,7 +42,6 @@ public interface RaftProxy extends PartitionProxy {
     protected Recovery recoveryStrategy = Recovery.RECOVER;
     protected int maxRetries = 0;
     protected Duration retryDelay = Duration.ofMillis(100);
-    protected Executor executor;
 
     /**
      * Sets the minimum session timeout.
@@ -152,9 +151,9 @@ public interface RaftProxy extends PartitionProxy {
      * @return The proxy builder.
      * @throws NullPointerException if the executor is null
      */
+    @Deprecated
     public Builder withExecutor(Executor executor) {
-      this.executor = executor;
-      return this;
+      throw new UnsupportedOperationException();
     }
   }
 }

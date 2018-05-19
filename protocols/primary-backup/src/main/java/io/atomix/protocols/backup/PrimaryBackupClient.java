@@ -39,7 +39,6 @@ import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -109,6 +108,7 @@ public class PrimaryBackupClient implements ProxyClient {
             threadContextFactory.createContext());
 
         PartitionProxy proxy;
+        ThreadContext context = threadContextFactory.createContext();
         if (recovery == Recovery.RECOVER) {
           proxy = new RecoveringPartitionProxy(
               clientName,
@@ -116,7 +116,7 @@ public class PrimaryBackupClient implements ProxyClient {
               primitiveName,
               primitiveType,
               proxyBuilder,
-              threadContextFactory.createContext());
+              context);
         } else {
           proxy = proxyBuilder.get();
         }
@@ -125,14 +125,13 @@ public class PrimaryBackupClient implements ProxyClient {
         if (maxRetries > 0) {
           proxy = new RetryingPartitionProxy(
               proxy,
-              threadContextFactory.createContext(),
+              context,
               maxRetries,
               retryDelay);
         }
 
         // Default the executor to use the configured thread pool executor and create a blocking aware proxy client.
-        Executor executor = this.executor != null ? this.executor : threadContextFactory.createContext();
-        return new BlockingAwarePartitionProxy(proxy, executor);
+        return new BlockingAwarePartitionProxy(proxy, context);
       }
     };
   }

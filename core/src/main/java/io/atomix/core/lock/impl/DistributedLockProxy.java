@@ -18,26 +18,20 @@ package io.atomix.core.lock.impl;
 import com.google.common.collect.Maps;
 import io.atomix.core.lock.AsyncDistributedLock;
 import io.atomix.core.lock.DistributedLock;
+import io.atomix.primitive.AbstractAsyncPrimitiveProxy;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveRegistry;
-import io.atomix.primitive.AbstractAsyncPrimitiveProxy;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.proxy.Proxy;
-import io.atomix.utils.concurrent.OrderedExecutor;
+import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.time.Version;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-
-import static io.atomix.utils.concurrent.Futures.orderedFuture;
 
 /**
  * Raft lock.
@@ -45,16 +39,12 @@ import static io.atomix.utils.concurrent.Futures.orderedFuture;
 public class DistributedLockProxy
     extends AbstractAsyncPrimitiveProxy<AsyncDistributedLock, DistributedLockService>
     implements AsyncDistributedLock, DistributedLockClient {
-  private final ScheduledExecutorService scheduledExecutor;
-  private final Executor orderedExecutor;
   private final Map<Integer, LockAttempt> attempts = Maps.newConcurrentMap();
   private final AtomicInteger id = new AtomicInteger();
   private final AtomicInteger lock = new AtomicInteger();
 
-  public DistributedLockProxy(PrimitiveProxy proxy, PrimitiveRegistry registry, ScheduledExecutorService scheduledExecutor) {
+  public DistributedLockProxy(PrimitiveProxy proxy, PrimitiveRegistry registry) {
     super(DistributedLockService.class, proxy, registry);
-    this.scheduledExecutor = scheduledExecutor;
-    this.orderedExecutor = new OrderedExecutor(scheduledExecutor);
     proxy.addStateChangeListener(this::onStateChange);
   }
 
@@ -96,9 +86,7 @@ public class DistributedLockProxy
         attempt.completeExceptionally(error);
       }
     });
-
-    // Return an ordered future that can safely be blocked inside the executor thread.
-    return orderedFuture(attempt, orderedExecutor, scheduledExecutor);
+    return attempt;
   }
 
   @Override
@@ -118,10 +106,7 @@ public class DistributedLockProxy
         attempt.completeExceptionally(error);
       }
     });
-
-    // Return an ordered future that can safely be blocked inside the executor thread.
-    return orderedFuture(attempt, orderedExecutor, scheduledExecutor)
-        .thenApply(Optional::ofNullable);
+    return attempt.thenApply(Optional::ofNullable);
   }
 
   @Override
@@ -149,10 +134,7 @@ public class DistributedLockProxy
             attempt.completeExceptionally(error);
           }
         });
-
-    // Return an ordered future that can safely be blocked inside the executor thread.
-    return orderedFuture(attempt, orderedExecutor, scheduledExecutor)
-        .thenApply(Optional::ofNullable);
+    return attempt.thenApply(Optional::ofNullable);
   }
 
   @Override
@@ -160,10 +142,7 @@ public class DistributedLockProxy
     // Use the current lock ID to ensure we only unlock the lock currently held by this process.
     int lock = this.lock.getAndSet(0);
     if (lock != 0) {
-      return orderedFuture(
-          acceptBy(getPartitionKey(), service -> service.unlock(lock)),
-          orderedExecutor,
-          scheduledExecutor);
+      return acceptBy(getPartitionKey(), service -> service.unlock(lock));
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -185,7 +164,7 @@ public class DistributedLockProxy
    */
   private class LockAttempt extends CompletableFuture<Version> {
     private final int id;
-    private final ScheduledFuture<?> scheduledFuture;
+    private final Scheduled scheduled;
 
     LockAttempt() {
       this(null, null);
@@ -193,9 +172,8 @@ public class DistributedLockProxy
 
     LockAttempt(Duration duration, Consumer<LockAttempt> callback) {
       this.id = DistributedLockProxy.this.id.incrementAndGet();
-      this.scheduledFuture = duration != null && callback != null
-          ? scheduledExecutor.schedule(() -> callback.accept(this), duration.toMillis(), TimeUnit.MILLISECONDS)
-          : null;
+      this.scheduled = duration != null && callback != null
+          ? getPartition(getPartitionKey()).context().schedule(duration, () -> callback.accept(this)) : null;
       attempts.put(id, this);
     }
 
@@ -229,8 +207,8 @@ public class DistributedLockProxy
     }
 
     private void cancel() {
-      if (scheduledFuture != null) {
-        scheduledFuture.cancel(false);
+      if (scheduled != null) {
+        scheduled.cancel();
       }
       attempts.remove(id);
     }

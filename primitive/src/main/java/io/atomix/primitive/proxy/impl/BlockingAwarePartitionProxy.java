@@ -20,31 +20,30 @@ import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.proxy.PartitionProxy;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static io.atomix.utils.concurrent.Futures.asyncFuture;
 
 /**
  * Raft proxy delegate that completes futures on a thread pool.
  */
 public class BlockingAwarePartitionProxy extends DelegatingPartitionProxy {
-  private final Executor executor;
+  private final ThreadContext context;
   private final Map<Consumer<PartitionProxy.State>, Consumer<PartitionProxy.State>> stateChangeListeners = Maps.newConcurrentMap();
   private final Map<Consumer<PrimitiveEvent>, Consumer<PrimitiveEvent>> eventListeners = Maps.newConcurrentMap();
 
-  public BlockingAwarePartitionProxy(PartitionProxy delegate, Executor executor) {
+  public BlockingAwarePartitionProxy(PartitionProxy delegate, ThreadContext context) {
     super(delegate);
-    this.executor = checkNotNull(executor, "executor cannot be null");
+    this.context = context;
   }
 
   @Override
   public void addStateChangeListener(Consumer<PartitionProxy.State> listener) {
-    Consumer<PartitionProxy.State> wrappedListener = state -> executor.execute(() -> listener.accept(state));
+    Consumer<PartitionProxy.State> wrappedListener = state -> context.execute(() -> listener.accept(state));
     stateChangeListeners.put(listener, wrappedListener);
     super.addStateChangeListener(wrappedListener);
   }
@@ -59,12 +58,12 @@ public class BlockingAwarePartitionProxy extends DelegatingPartitionProxy {
 
   @Override
   public CompletableFuture<byte[]> execute(PrimitiveOperation operation) {
-    return Futures.blockingAwareFuture(super.execute(operation), executor);
+    return asyncFuture(super.execute(operation), context);
   }
 
   @Override
   public void addEventListener(EventType eventType, Consumer<PrimitiveEvent> listener) {
-    Consumer<PrimitiveEvent> wrappedListener = e -> executor.execute(() -> listener.accept(e));
+    Consumer<PrimitiveEvent> wrappedListener = e -> context.execute(() -> listener.accept(e));
     eventListeners.put(listener, wrappedListener);
     super.addEventListener(eventType, wrappedListener);
   }

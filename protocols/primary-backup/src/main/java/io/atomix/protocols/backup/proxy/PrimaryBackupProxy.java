@@ -40,6 +40,7 @@ import io.atomix.protocols.backup.protocol.ExecuteRequest;
 import io.atomix.protocols.backup.protocol.PrimaryBackupClientProtocol;
 import io.atomix.protocols.backup.protocol.PrimaryBackupResponse.Status;
 import io.atomix.protocols.backup.protocol.PrimitiveDescriptor;
+import io.atomix.utils.concurrent.AtomixFuture;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
@@ -130,6 +131,11 @@ public class PrimaryBackupProxy implements PartitionProxy {
   @Override
   public SessionId sessionId() {
     return sessionId;
+  }
+
+  @Override
+  public ThreadContext context() {
+    return threadContext;
   }
 
   @Override
@@ -263,7 +269,7 @@ public class PrimaryBackupProxy implements PartitionProxy {
 
   @Override
   public CompletableFuture<PartitionProxy> connect() {
-    CompletableFuture<PartitionProxy> future = new CompletableFuture<>();
+    CompletableFuture<PartitionProxy> future = new AtomixFuture<>();
     threadContext.execute(() -> {
       connect(1, future);
     });
@@ -301,7 +307,7 @@ public class PrimaryBackupProxy implements PartitionProxy {
 
   @Override
   public CompletableFuture<Void> close() {
-    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture<Void> future = new AtomixFuture<>();
     PrimaryTerm term = this.term;
     if (term.primary() != null) {
       protocol.close(term.primary().memberId(), new CloseRequest(descriptor, sessionId.id()))
@@ -327,7 +333,6 @@ public class PrimaryBackupProxy implements PartitionProxy {
     protected int numBackups = 1;
     protected int maxRetries = 0;
     protected Duration retryDelay = Duration.ofMillis(100);
-    protected Executor executor;
 
     /**
      * Sets the protocol consistency model.
@@ -427,9 +432,9 @@ public class PrimaryBackupProxy implements PartitionProxy {
      * @return The proxy builder.
      * @throws NullPointerException if the executor is null
      */
+    @Deprecated
     public Builder withExecutor(Executor executor) {
-      this.executor = executor;
-      return this;
+      throw new UnsupportedOperationException();
     }
   }
 }

@@ -28,7 +28,7 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.OrderedFuture;
 import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.concurrent.Scheduler;
+import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public class RecoveringPartitionProxy implements PartitionProxy {
   private final String name;
   private final PrimitiveType primitiveType;
   private final Supplier<PartitionProxy> proxyFactory;
-  private final Scheduler scheduler;
+  private final ThreadContext context;
   private Logger log;
   private volatile OrderedFuture<PartitionProxy> clientFuture;
   private volatile PartitionProxy proxy;
@@ -62,12 +62,18 @@ public class RecoveringPartitionProxy implements PartitionProxy {
   private Scheduled recoverTask;
   private volatile boolean connected = false;
 
-  public RecoveringPartitionProxy(String clientId, PartitionId partitionId, String name, PrimitiveType primitiveType, Supplier<PartitionProxy> proxyFactory, Scheduler scheduler) {
+  public RecoveringPartitionProxy(
+      String clientId,
+      PartitionId partitionId,
+      String name,
+      PrimitiveType primitiveType,
+      Supplier<PartitionProxy> proxyFactory,
+      ThreadContext context) {
     this.partitionId = checkNotNull(partitionId);
     this.name = checkNotNull(name);
     this.primitiveType = checkNotNull(primitiveType);
     this.proxyFactory = checkNotNull(proxyFactory);
-    this.scheduler = checkNotNull(scheduler);
+    this.context = checkNotNull(context);
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PartitionProxy.class)
         .addValue(clientId)
         .build());
@@ -92,6 +98,11 @@ public class RecoveringPartitionProxy implements PartitionProxy {
   @Override
   public PrimitiveType type() {
     return primitiveType;
+  }
+
+  @Override
+  public ThreadContext context() {
+    return context;
   }
 
   @Override
@@ -188,7 +199,7 @@ public class RecoveringPartitionProxy implements PartitionProxy {
       if (error == null) {
         future.complete(proxy);
       } else {
-        recoverTask = scheduler.schedule(Duration.ofSeconds(1), () -> openProxy(future));
+        recoverTask = context.schedule(Duration.ofSeconds(1), () -> openProxy(future));
       }
     });
   }
