@@ -19,19 +19,25 @@ import io.atomix.core.AtomixConfig;
 import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.protocols.backup.partition.PrimaryBackupPartitionGroupConfig;
 
+import static io.atomix.core.profile.AbstractProfile.findProfileType;
+
 /**
  * In-memory data grid profile.
  */
-public class DataGridProfile implements NamedProfile {
-  private static final String NAME = "data-grid";
+public class DataGridProfile implements Profile {
+
+  /**
+   * The data-grid profile type.
+   */
+  private static final ProfileType TYPE = findProfileType(DataGridProfile.class);
 
   private static final String SYSTEM_GROUP_NAME = "system";
   private static final String GROUP_NAME = "data";
   private static final int NUM_PARTITIONS = 71;
 
   @Override
-  public String name() {
-    return NAME;
+  public ProfileType type() {
+    return TYPE;
   }
 
   @Override

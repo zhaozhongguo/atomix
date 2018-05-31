@@ -29,6 +29,7 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
+import io.atomix.primitive.protocol.PrimitiveProtocolType;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.storage.StorageLevel;
 import org.slf4j.Logger;
@@ -54,7 +55,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Raft partition group.
  */
 public class RaftPartitionGroup implements ManagedPartitionGroup {
-  public static final PartitionGroup.Type TYPE = new Type();
 
   /**
    * Returns a new Raft partition group builder.
@@ -66,18 +66,6 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
     return new Builder(new RaftPartitionGroupConfig().setName(name));
   }
 
-  /**
-   * The Raft partition group type.
-   */
-  public static class Type implements PartitionGroup.Type {
-    private static final String NAME = "raft";
-
-    @Override
-    public String name() {
-      return NAME;
-    }
-  }
-
   private static final Logger LOGGER = LoggerFactory.getLogger(RaftPartitionGroup.class);
 
   private static Collection<RaftPartition> buildPartitions(RaftPartitionGroupConfig config) {
@@ -87,6 +75,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
       partitions.add(new RaftPartition(
           PartitionId.from(config.getName(), i + 1),
           StorageLevel.valueOf(config.getStorageLevel().toUpperCase()),
+          config.getSegmentSize().bytes(),
           config.isFlushOnCommit(),
           new File(partitionsDir, String.valueOf(i + 1))));
     }
@@ -94,6 +83,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   }
 
   private final String name;
+  private final String type;
   private final RaftPartitionGroupConfig config;
   private final int partitionSize;
   private final Map<PartitionId, RaftPartition> partitions = Maps.newConcurrentMap();
@@ -101,6 +91,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   private Collection<PartitionMetadata> metadata;
 
   public RaftPartitionGroup(RaftPartitionGroupConfig config) {
+    this.type = config.getType();
     this.name = config.getName();
     this.config = config;
     this.partitionSize = config.getPartitionSize();
@@ -117,13 +108,16 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   }
 
   @Override
-  public PartitionGroup.Type type() {
-    return TYPE;
+  public String type() {
+    return type;
   }
 
   @Override
-  public PrimitiveProtocol.Type protocol() {
-    return MultiRaftProtocol.TYPE;
+  public PrimitiveProtocolType protocol() {
+    return PrimitiveProtocolType.builder()
+        .withName(MultiRaftProtocol.NAME)
+        .withProtocolClass(MultiRaftProtocol.class)
+        .build();
   }
 
   @Override

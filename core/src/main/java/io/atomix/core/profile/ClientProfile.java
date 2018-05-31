@@ -17,15 +17,21 @@ package io.atomix.core.profile;
 
 import io.atomix.core.AtomixConfig;
 
+import static io.atomix.core.profile.AbstractProfile.findProfileType;
+
 /**
  * Client profile.
  */
-public class ClientProfile implements NamedProfile {
-  private static final String NAME = "client";
+public class ClientProfile implements Profile {
+
+  /**
+   * The client profile type.
+   */
+  private static final ProfileType TYPE = findProfileType(ClientProfile.class);
 
   @Override
-  public String name() {
-    return NAME;
+  public ProfileType type() {
+    return TYPE;
   }
 
   @Override
