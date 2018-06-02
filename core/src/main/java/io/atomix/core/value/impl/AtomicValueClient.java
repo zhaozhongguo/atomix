@@ -13,40 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.lock.impl;
+package io.atomix.core.value.impl;
 
-import io.atomix.primitive.operation.Command;
+import io.atomix.primitive.event.Event;
 
 /**
- * Distributed lock service.
+ * Atomic value client.
  */
-public interface DistributedLockService {
+public interface AtomicValueClient {
 
   /**
-   * Attempts to acquire a lock.
+   * Notifies the client of a change event.
    *
-   * @param lockId the lock identifier
+   * @param newValue the updated value
+   * @param oldValue the previous value
    */
-  @Command("lock")
-  default void lock(int lockId) {
-    lock(lockId, -1);
-  }
-
-  /**
-   * Attempts to acquire a lock.
-   *
-   * @param lockId  the lock identifier
-   * @param timeout the lock to acquire
-   */
-  @Command("lockWithTimeout")
-  void lock(int lockId, long timeout);
-
-  /**
-   * Unlocks an owned lock.
-   *
-   * @param lockId the lock identifier
-   */
-  @Command("unlock")
-  void unlock(int lockId);
+  @Event
+  void change(byte[] newValue, byte[] oldValue);
 
 }
