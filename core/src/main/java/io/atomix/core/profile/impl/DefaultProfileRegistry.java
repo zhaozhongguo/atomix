@@ -15,35 +15,29 @@
  */
 package io.atomix.core.profile.impl;
 
-import com.google.common.collect.Maps;
-import io.atomix.core.profile.ProfileType;
-import io.atomix.core.profile.ProfileTypeRegistry;
+import io.atomix.core.profile.Profile;
+import io.atomix.core.profile.ProfileRegistry;
 
 import java.util.Collection;
 import java.util.Map;
 
 /**
- * Default profile type registry.
+ * Profile type registry.
  */
-public class DefaultProfileTypeRegistry implements ProfileTypeRegistry {
-  private final Map<String, ProfileType> profileTypes = Maps.newConcurrentMap();
+public class DefaultProfileRegistry implements ProfileRegistry {
+  private final Map<String, Profile> profileTypes;
 
-  public DefaultProfileTypeRegistry(Collection<ProfileType> profileTypes) {
-    profileTypes.forEach(profileType -> this.profileTypes.put(profileType.name(), profileType));
+  public DefaultProfileRegistry(Map<String, Profile> profileTypes) {
+    this.profileTypes = profileTypes;
   }
 
   @Override
-  public Collection<ProfileType> getProfileTypes() {
+  public Collection<Profile> getProfiles() {
     return profileTypes.values();
   }
 
   @Override
-  public ProfileType getProfileType(String name) {
+  public Profile getProfile(String name) {
     return profileTypes.get(name);
-  }
-
-  @Override
-  public void addProfileType(ProfileType type) {
-    profileTypes.putIfAbsent(type.name(), type);
   }
 }

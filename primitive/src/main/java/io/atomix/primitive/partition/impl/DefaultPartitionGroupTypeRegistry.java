@@ -15,50 +15,29 @@
  */
 package io.atomix.primitive.partition.impl;
 
-import com.google.common.collect.Maps;
-import io.atomix.primitive.partition.ManagedPartitionGroup;
-import io.atomix.primitive.partition.PartitionGroupConfig;
-import io.atomix.primitive.partition.PartitionGroupFactory;
-import io.atomix.primitive.partition.PartitionGroupType;
+import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
-import io.atomix.utils.config.ConfigurationException;
 
 import java.util.Collection;
 import java.util.Map;
 
 /**
- * Default partition group type registry.
+ * Partition group type registry.
  */
 public class DefaultPartitionGroupTypeRegistry implements PartitionGroupTypeRegistry {
-  private final Map<String, PartitionGroupType> partitionGroupTypes = Maps.newConcurrentMap();
+  private final Map<String, PartitionGroup.Type> partitionGroupTypes;
 
-  public DefaultPartitionGroupTypeRegistry(Collection<PartitionGroupType> partitionGroupTypes) {
-    partitionGroupTypes.forEach(partitionGroupType -> this.partitionGroupTypes.put(partitionGroupType.name(), partitionGroupType));
+  public DefaultPartitionGroupTypeRegistry(Map<String, PartitionGroup.Type> partitionGroupTypes) {
+    this.partitionGroupTypes = partitionGroupTypes;
   }
 
   @Override
-  public Collection<PartitionGroupType> getGroupTypes() {
+  public Collection<PartitionGroup.Type> getGroupTypes() {
     return partitionGroupTypes.values();
   }
 
   @Override
-  public PartitionGroupType getGroupType(String name) {
+  public PartitionGroup.Type getGroupType(String name) {
     return partitionGroupTypes.get(name);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public ManagedPartitionGroup createGroup(PartitionGroupConfig config) {
-    PartitionGroupType typeConfig = partitionGroupTypes.get(config.getType());
-    if (typeConfig == null) {
-      throw new ConfigurationException("Unknown partition group type " + config.getType());
-    }
-
-    try {
-      PartitionGroupFactory factory = typeConfig.factoryClass().newInstance();
-      return factory.createGroup(config);
-    } catch (InstantiationException | IllegalAccessException e) {
-      throw new ConfigurationException("Failed to instantiate partition group factory", e);
-    }
   }
 }

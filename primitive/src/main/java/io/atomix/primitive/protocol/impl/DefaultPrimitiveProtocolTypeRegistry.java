@@ -15,43 +15,29 @@
  */
 package io.atomix.primitive.protocol.impl;
 
-import com.google.common.collect.Maps;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
-import io.atomix.primitive.protocol.PrimitiveProtocolType;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.utils.config.ConfigurationException;
 
 import java.util.Collection;
 import java.util.Map;
 
 /**
- * Default primitive protocol type registry.
+ * Primitive protocol type registry.
  */
 public class DefaultPrimitiveProtocolTypeRegistry implements PrimitiveProtocolTypeRegistry {
-  private final Map<String, PrimitiveProtocolType> protocolTypes = Maps.newConcurrentMap();
+  private final Map<String, PrimitiveProtocol.Type> protocolTypes;
 
-  public DefaultPrimitiveProtocolTypeRegistry(Collection<PrimitiveProtocolType> protocolTypes) {
-    protocolTypes.forEach(protocolType -> this.protocolTypes.put(protocolType.name(), protocolType));
+  public DefaultPrimitiveProtocolTypeRegistry(Map<String, PrimitiveProtocol.Type> protocolTypes) {
+    this.protocolTypes = protocolTypes;
   }
 
   @Override
-  public Collection<PrimitiveProtocolType> getProtocolTypes() {
+  public Collection<PrimitiveProtocol.Type> getProtocolTypes() {
     return protocolTypes.values();
   }
 
   @Override
-  public PrimitiveProtocolType getProtocolType(String type) {
+  public PrimitiveProtocol.Type getProtocolType(String type) {
     return protocolTypes.get(type);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public PrimitiveProtocol createProtocol(PrimitiveProtocolConfig config) {
-    PrimitiveProtocolType protocolType = protocolTypes.get(config.getType());
-    if (protocolType == null) {
-      throw new ConfigurationException("Unknown protocol type " + config.getType());
-    }
-    return protocolType.createProtocol(config);
   }
 }

@@ -15,49 +15,33 @@
  */
 package io.atomix.primitive.impl;
 
-import com.google.common.collect.Maps;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.PrimitiveTypeRegistry;
-import io.atomix.utils.config.ConfigurationException;
+import io.atomix.utils.ServiceException;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 
 /**
- * Default primitive type registry.
+ * Primitive type registry.
  */
 public class DefaultPrimitiveTypeRegistry implements PrimitiveTypeRegistry {
-  private final Map<String, PrimitiveType> types = Maps.newConcurrentMap();
+  private final Map<String, PrimitiveType> primitiveTypes;
 
-  public DefaultPrimitiveTypeRegistry() {
-    this(new ArrayList<>());
-  }
-
-  public DefaultPrimitiveTypeRegistry(Collection<PrimitiveType> types) {
-    types.forEach(type -> this.types.put(type.name(), type));
-  }
-
-  @Override
-  public void addPrimitiveType(PrimitiveType type) {
-    types.put(type.name(), type);
-  }
-
-  @Override
-  public void removePrimitiveType(PrimitiveType type) {
-    types.remove(type.name());
+  public DefaultPrimitiveTypeRegistry(Map<String, PrimitiveType> primitiveTypes) {
+    this.primitiveTypes = primitiveTypes;
   }
 
   @Override
   public Collection<PrimitiveType> getPrimitiveTypes() {
-    return types.values();
+    return primitiveTypes.values();
   }
 
   @Override
   public PrimitiveType getPrimitiveType(String typeName) {
-    PrimitiveType type = types.get(typeName);
+    PrimitiveType type = primitiveTypes.get(typeName);
     if (type == null) {
-      throw new ConfigurationException("Unknown primitive type " + typeName);
+      throw new ServiceException("Unknown primitive type " + typeName);
     }
     return type;
   }

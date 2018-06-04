@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-present Open Networking Foundation
+ * Copyright 2017-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.utils.config;
+package io.atomix.cluster.messaging;
 
-import io.atomix.core.profile.Profile;
-import io.atomix.core.registry.AtomixRegistry;
+import io.atomix.utils.Managed;
 
 /**
- * Profile configuration mapper.
+ * Managed cluster event service.
  */
-public class ProfileMapper extends PolymorphicTypeMapper<Profile> {
-  public ProfileMapper() {
-    super(Profile.class);
-  }
-
-  @Override
-  public Class<? extends Profile> getConcreteClass(AtomixRegistry registry, String type) {
-    return registry.profileTypes().getProfileType(type).profileClass();
-  }
+public interface ManagedClusterEventService extends ClusterEventService, Managed<ClusterEventService> {
 }
