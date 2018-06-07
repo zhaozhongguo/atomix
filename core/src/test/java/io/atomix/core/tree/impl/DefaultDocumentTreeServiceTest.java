@@ -13,49 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.counter.impl;
+package io.atomix.core.tree.impl;
 
-import io.atomix.core.counter.impl.AtomicCounterOperations.Set;
-import io.atomix.primitive.service.ServiceConfig;
+import io.atomix.core.tree.DocumentPath;
 import io.atomix.primitive.service.impl.DefaultBackupInput;
 import io.atomix.primitive.service.impl.DefaultBackupOutput;
-import io.atomix.primitive.service.impl.DefaultCommit;
-import io.atomix.primitive.session.PrimitiveSession;
 import io.atomix.storage.buffer.Buffer;
 import io.atomix.storage.buffer.HeapBuffer;
+import io.atomix.utils.time.Versioned;
 import org.junit.Test;
 
-import static io.atomix.core.counter.impl.AtomicCounterOperations.GET;
-import static io.atomix.core.counter.impl.AtomicCounterOperations.SET;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
- * Counter service test.
+ * Document tree service test.
  */
-public class AtomicCounterServiceTest {
+public class DefaultDocumentTreeServiceTest {
+
   @Test
   public void testSnapshot() throws Exception {
-    AtomicCounterService service = new AtomicCounterService(new ServiceConfig());
-    service.set(new DefaultCommit<>(
-        2,
-        SET,
-        new Set(1L),
-        mock(PrimitiveSession.class),
-        System.currentTimeMillis()));
+    DefaultDocumentTreeService service = new DefaultDocumentTreeService();
+    service.set(DocumentPath.from("root|foo"), "Hello world!".getBytes());
 
     Buffer buffer = HeapBuffer.allocate();
     service.backup(new DefaultBackupOutput(buffer, service.serializer()));
 
-    service = new AtomicCounterService(new ServiceConfig());
+    service = new DefaultDocumentTreeService();
     service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
 
-    long value = service.get(new DefaultCommit<>(
-        2,
-        GET,
-        null,
-        mock(PrimitiveSession.class),
-        System.currentTimeMillis()));
-    assertEquals(1, value);
+    Versioned<byte[]> value = service.get(DocumentPath.from("root|foo"));
+    assertNotNull(value);
+    assertArrayEquals("Hello world!".getBytes(), value.value());
   }
 }

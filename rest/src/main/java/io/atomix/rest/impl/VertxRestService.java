@@ -88,7 +88,7 @@ public class VertxRestService implements ManagedRestService {
     deployment.getDispatcher().getDefaultContextObjects()
         .put(ClusterCommunicationService.class, atomix.getCommunicationService());
     deployment.getDispatcher().getDefaultContextObjects()
-        .put(ClusterEventService.class, atomix.getEventingService());
+        .put(ClusterEventService.class, atomix.getEventService());
     deployment.getDispatcher().getDefaultContextObjects()
         .put(PrimitivesService.class, atomix.getPrimitivesService());
     deployment.getDispatcher().getDefaultContextObjects()
@@ -140,6 +140,7 @@ public class VertxRestService implements ManagedRestService {
   private ObjectMapper createObjectMapper() {
     ObjectMapper mapper = new ObjectMapper();
 
+    mapper.setPropertyNamingStrategy(new ConfigPropertyNamingStrategy());
     mapper.enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
     mapper.enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES);
     mapper.configure(JsonParser.Feature.ALLOW_COMMENTS, true);
