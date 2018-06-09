@@ -16,11 +16,12 @@
 package io.atomix.core.generator.impl;
 
 import io.atomix.core.counter.impl.AtomicCounterProxy;
+import io.atomix.core.counter.impl.AtomicCounterService;
 import io.atomix.core.generator.AtomicIdGenerator;
 import io.atomix.core.generator.AtomicIdGeneratorBuilder;
 import io.atomix.core.generator.AtomicIdGeneratorConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
 
 import java.util.concurrent.CompletableFuture;
@@ -36,9 +37,10 @@ public class DelegatingAtomicIdGeneratorBuilder extends AtomicIdGeneratorBuilder
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicIdGenerator> buildAsync() {
-    PrimitiveProxy proxy = protocol().newProxy(
+    ProxyClient<AtomicCounterService> proxy = protocol().newProxy(
         name(),
         primitiveType(),
+        AtomicCounterService.class,
         new ServiceConfig(),
         managementService.getPartitionService());
     return new AtomicCounterProxy(proxy, managementService.getPrimitiveRegistry())

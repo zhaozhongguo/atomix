@@ -22,7 +22,7 @@ import io.atomix.core.multimap.ConsistentMultimap;
 import io.atomix.core.multimap.ConsistentMultimapBuilder;
 import io.atomix.core.multimap.ConsistentMultimapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
 
@@ -39,9 +39,10 @@ public class ConsistentMultimapProxyBuilder<K, V> extends ConsistentMultimapBuil
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<ConsistentMultimap<K, V>> buildAsync() {
-    PrimitiveProxy proxy = protocol().newProxy(
+    ProxyClient<ConsistentSetMultimapService> proxy = protocol().newProxy(
         name(),
         primitiveType(),
+        ConsistentSetMultimapService.class,
         new ServiceConfig(),
         managementService.getPartitionService());
     return new ConsistentSetMultimapProxy(proxy, managementService.getPrimitiveRegistry())

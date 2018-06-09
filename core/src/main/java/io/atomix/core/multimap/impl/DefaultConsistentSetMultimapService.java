@@ -28,7 +28,7 @@ import io.atomix.core.multimap.ConsistentMultimapType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.misc.Match;
 import io.atomix.utils.serializer.KryoNamespace;
@@ -108,12 +108,12 @@ public class DefaultConsistentSetMultimapService extends AbstractPrimitiveServic
   }
 
   @Override
-  public void onExpire(PrimitiveSession session) {
+  public void onExpire(Session session) {
     listeners.remove(session.sessionId());
   }
 
   @Override
-  public void onClose(PrimitiveSession session) {
+  public void onClose(Session session) {
     listeners.remove(session.sessionId());
   }
 
@@ -320,7 +320,7 @@ public class DefaultConsistentSetMultimapService extends AbstractPrimitiveServic
    * @param newValue the new value
    */
   private void onChange(String key, byte[] oldValue, byte[] newValue) {
-    listeners.forEach(id -> acceptOn(id, client -> client.onChange(key, oldValue, newValue)));
+    listeners.forEach(id -> getSession(id).accept(client -> client.onChange(key, oldValue, newValue)));
   }
 
   private interface MapEntryValues {

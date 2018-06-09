@@ -20,11 +20,12 @@ import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.proxy.PartitionProxy;
-import io.atomix.primitive.proxy.PrimitiveProxy;
-import io.atomix.primitive.proxy.impl.PartitionedPrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.primitive.proxy.impl.DefaultProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
-import io.atomix.protocols.raft.proxy.CommunicationStrategy;
+import io.atomix.primitive.session.SessionClient;
+import io.atomix.protocols.raft.partition.RaftPartition;
+import io.atomix.protocols.raft.session.CommunicationStrategy;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -38,7 +39,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Multi-Raft protocol.
  */
 public class MultiRaftProtocol implements PrimitiveProtocol {
-  public static Type TYPE = new Type();
+  public static final Type TYPE = new Type();
 
   /**
    * Returns a new multi-Raft protocol builder.
@@ -98,11 +99,12 @@ public class MultiRaftProtocol implements PrimitiveProtocol {
   }
 
   @Override
-  public PrimitiveProxy newProxy(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig, PartitionService partitionService) {
-    Collection<PartitionProxy> partitions = partitionService.getPartitionGroup(this)
+  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, ServiceConfig serviceConfig, PartitionService partitionService) {
+    Collection<SessionClient> partitions = partitionService.getPartitionGroup(this)
         .getPartitions()
         .stream()
-        .map(partition -> ((RaftClient) partition.getProxyClient()).proxyBuilder(primitiveName, primitiveType, serviceConfig)
+        .map(partition -> ((RaftPartition) partition).getClient()
+            .sessionBuilder(primitiveName, primitiveType, serviceConfig)
             .withMinTimeout(config.getMinTimeout())
             .withMaxTimeout(config.getMaxTimeout())
             .withReadConsistency(config.getReadConsistency())
@@ -110,10 +112,9 @@ public class MultiRaftProtocol implements PrimitiveProtocol {
             .withRecoveryStrategy(config.getRecoveryStrategy())
             .withMaxRetries(config.getMaxRetries())
             .withRetryDelay(config.getRetryDelay())
-            .withExecutor(config.getExecutor())
             .build())
         .collect(Collectors.toList());
-    return new PartitionedPrimitiveProxy(primitiveName, primitiveType, partitions, config.getPartitioner());
+    return new DefaultProxyClient<>(primitiveName, primitiveType, serviceType, partitions, config.getPartitioner());
   }
 
   /**
@@ -242,8 +243,8 @@ public class MultiRaftProtocol implements PrimitiveProtocol {
      * @return The proxy builder.
      * @throws NullPointerException if the executor is null
      */
+    @Deprecated
     public Builder withExecutor(Executor executor) {
-      config.setExecutor(executor);
       return this;
     }
 

@@ -28,7 +28,7 @@ import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.TestPrimaryElection;
-import io.atomix.primitive.proxy.PartitionProxy;
+import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
@@ -36,7 +36,7 @@ import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceExecutor;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
 import io.atomix.protocols.backup.protocol.TestPrimaryBackupProtocolFactory;
@@ -94,7 +94,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(nodes);
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, backups, replication);
+    SessionClient session = createProxy(client, backups, replication);
     session.execute(operation(WRITE)).thenRun(this::resume);
 
     await(5000);
@@ -122,7 +122,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(nodes);
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, backups, replication);
+    SessionClient session = createProxy(client, backups, replication);
     session.execute(operation(READ)).thenRun(this::resume);
 
     await(5000);
@@ -153,7 +153,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     AtomicLong index = new AtomicLong();
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, backups, replication);
+    SessionClient session = createProxy(client, backups, replication);
     session.<Long>addEventListener(CHANGE_EVENT, event -> {
       threadAssertEquals(count.incrementAndGet(), 2L);
       threadAssertEquals(index.get(), SERIALIZER.decode(event.value()));
@@ -194,14 +194,14 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(nodes);
 
     PrimaryBackupClient client1 = createClient();
-    PartitionProxy session1 = createProxy(client1, backups, replication);
+    SessionClient session1 = createProxy(client1, backups, replication);
     session1.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
     });
 
     PrimaryBackupClient client2 = createClient();
-    PartitionProxy session2 = createProxy(client2, backups, replication);
+    SessionClient session2 = createProxy(client2, backups, replication);
     session2.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
@@ -237,7 +237,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(nodes);
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, backups, replication);
+    SessionClient session = createProxy(client, backups, replication);
     session.addEventListener(CHANGE_EVENT, message -> {
       threadAssertNotNull(message);
       resume();
@@ -269,7 +269,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     List<PrimaryBackupServer> servers = createServers(5);
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, 3, replication);
+    SessionClient session = createProxy(client, 3, replication);
     session.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
@@ -314,20 +314,20 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(3);
 
     PrimaryBackupClient client = createClient();
-    PartitionProxy session = createProxy(client, 2, replication);
+    SessionClient session = createProxy(client, 2, replication);
     session.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
     });
 
-    PartitionProxy session1 = createProxy(createClient(), 2, replication);
+    SessionClient session1 = createProxy(createClient(), 2, replication);
     session1.execute(operation(READ)).thenRun(this::resume);
     session1.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
     });
 
-    PartitionProxy session2 = createProxy(createClient(), 2, replication);
+    SessionClient session2 = createProxy(createClient(), 2, replication);
     session2.execute(operation(READ)).thenRun(this::resume);
     session2.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
@@ -360,12 +360,12 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     createServers(3);
 
     PrimaryBackupClient client1 = createClient();
-    PartitionProxy session1 = createProxy(client1, 2, replication);
+    SessionClient session1 = createProxy(client1, 2, replication);
     PrimaryBackupClient client2 = createClient();
     session1.execute(operation(CLOSE)).thenRun(this::resume);
     await(Duration.ofSeconds(10).toMillis(), 1);
     session1.addEventListener(CLOSE_EVENT, e -> resume());
-    PartitionProxy session2 = createProxy(client2, 2, replication);
+    SessionClient session2 = createProxy(client2, 2, replication);
     session2.execute(operation(READ)).thenRun(this::resume);
     await(5000);
     session2.close().thenRun(this::resume);
@@ -441,8 +441,8 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
   /**
    * Creates a new primary-backup proxy.
    */
-  private PartitionProxy createProxy(PrimaryBackupClient client, int backups, Replication replication) {
-    return client.proxyBuilder("primary-backup-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
+  private SessionClient createProxy(PrimaryBackupClient client, int backups, Replication replication) {
+    return client.sessionBuilder("primary-backup-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
         .withNumBackups(backups)
         .withReplication(replication)
         .build()
@@ -523,14 +523,14 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     }
 
     @Override
-    public void onExpire(PrimitiveSession session) {
+    public void onExpire(Session session) {
       if (expire != null) {
         expire.session().publish(EXPIRE_EVENT);
       }
     }
 
     @Override
-    public void onClose(PrimitiveSession session) {
+    public void onClose(Session session) {
       if (close != null && !session.equals(close.session())) {
         close.session().publish(CLOSE_EVENT);
       }
@@ -558,7 +558,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
       if (commit.value()) {
         commit.session().publish(CHANGE_EVENT, commit.index());
       } else {
-        for (PrimitiveSession session : getSessions()) {
+        for (Session session : getSessions()) {
           session.publish(CHANGE_EVENT, commit.index());
         }
       }

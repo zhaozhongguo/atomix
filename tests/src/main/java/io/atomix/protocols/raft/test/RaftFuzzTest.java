@@ -27,7 +27,7 @@ import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.operation.impl.DefaultOperationId;
-import io.atomix.primitive.proxy.PartitionProxy;
+import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
@@ -75,7 +75,7 @@ import io.atomix.protocols.raft.protocol.ReconfigureResponse;
 import io.atomix.protocols.raft.protocol.ResetRequest;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.proxy.CommunicationStrategy;
+import io.atomix.protocols.raft.session.CommunicationStrategy;
 import io.atomix.protocols.raft.storage.RaftStorage;
 import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
 import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
@@ -326,7 +326,7 @@ public class RaftFuzzTest implements Runnable {
     for (int i = 0; i < clients; i++) {
       ReadConsistency consistency = randomConsistency();
       RaftClient client = createClient();
-      PartitionProxy proxy = createProxy(client, consistency);
+      SessionClient proxy = createProxy(client, consistency);
       Scheduler scheduler = new SingleThreadContext("fuzz-test-" + i);
 
       final int clientId = i;
@@ -623,8 +623,8 @@ public class RaftFuzzTest implements Runnable {
   /**
    * Creates a test session.
    */
-  private PartitionProxy createProxy(RaftClient client, ReadConsistency consistency) {
-    return client.proxyBuilder("raft-fuzz-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
+  private SessionClient createProxy(RaftClient client, ReadConsistency consistency) {
+    return client.sessionBuilder("raft-fuzz-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
         .withReadConsistency(consistency)
         .withCommunicationStrategy(COMMUNICATION_STRATEGY)
         .build()

@@ -27,7 +27,7 @@ import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.serializer.KryoNamespace;
@@ -778,16 +778,16 @@ public class DefaultConsistentMapService
    * @param events list of map event to publish
    */
   private void publish(List<MapEvent<String, byte[]>> events) {
-    listeners.forEach(listener -> events.forEach(event -> acceptOn(listener, client -> client.change(event))));
+    listeners.forEach(listener -> events.forEach(event -> getSession(listener).accept(client -> client.change(event))));
   }
 
   @Override
-  public void onExpire(PrimitiveSession session) {
+  public void onExpire(Session session) {
     listeners.remove(session.sessionId());
   }
 
   @Override
-  public void onClose(PrimitiveSession session) {
+  public void onClose(Session session) {
     listeners.remove(session.sessionId());
   }
 

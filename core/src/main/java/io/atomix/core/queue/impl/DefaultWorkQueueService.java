@@ -27,7 +27,7 @@ import io.atomix.core.queue.WorkQueueType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.KryoNamespace;
 import io.atomix.utils.serializer.Serializer;
@@ -129,7 +129,7 @@ public class DefaultWorkQueueService extends AbstractPrimitiveService<WorkQueueC
 
     // Send an event to all sessions that have expressed interest in task processing
     // and are not actively processing a task.
-    registeredWorkers.forEach(session -> acceptOn(session, client -> client.taskAvailable()));
+    registeredWorkers.forEach(sessionId -> getSession(sessionId).accept(client -> client.taskAvailable()));
     // FIXME: This generates a lot of event traffic.
   }
 
@@ -176,16 +176,16 @@ public class DefaultWorkQueueService extends AbstractPrimitiveService<WorkQueueC
   }
 
   @Override
-  public void onExpire(PrimitiveSession session) {
-    evictWorker(session.sessionId().id());
+  public void onExpire(Session session) {
+    evictWorker(session.sessionId());
   }
 
   @Override
-  public void onClose(PrimitiveSession session) {
-    evictWorker(session.sessionId().id());
+  public void onClose(Session session) {
+    evictWorker(session.sessionId());
   }
 
-  private void evictWorker(long sessionId) {
+  private void evictWorker(SessionId sessionId) {
     registeredWorkers.remove(sessionId);
 
     // TODO: Maintain an index of tasks by session for efficient access.
@@ -193,7 +193,7 @@ public class DefaultWorkQueueService extends AbstractPrimitiveService<WorkQueueC
     while (iter.hasNext()) {
       Map.Entry<String, TaskAssignment> entry = iter.next();
       TaskAssignment assignment = entry.getValue();
-      if (assignment.sessionId() == sessionId) {
+      if (assignment.sessionId() == sessionId.id()) {
         unassignedTasks.add(assignment.task());
         iter.remove();
       }

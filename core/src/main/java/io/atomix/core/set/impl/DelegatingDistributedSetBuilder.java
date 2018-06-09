@@ -19,13 +19,14 @@ import com.google.common.io.BaseEncoding;
 import io.atomix.core.map.AsyncConsistentMap;
 import io.atomix.core.map.impl.CachingAsyncConsistentMap;
 import io.atomix.core.map.impl.ConsistentMapProxy;
+import io.atomix.core.map.impl.ConsistentMapService;
 import io.atomix.core.map.impl.TranscodingAsyncConsistentMap;
 import io.atomix.core.map.impl.UnmodifiableAsyncConsistentMap;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.set.DistributedSetBuilder;
 import io.atomix.core.set.DistributedSetConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
 
@@ -44,9 +45,10 @@ public class DelegatingDistributedSetBuilder<E> extends DistributedSetBuilder<E>
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    PrimitiveProxy proxy = protocol().newProxy(
+    ProxyClient<ConsistentMapService> proxy = protocol().newProxy(
         name(),
         primitiveType(),
+        ConsistentMapService.class,
         new ServiceConfig(),
         managementService.getPartitionService());
     return new ConsistentMapProxy(proxy, managementService.getPrimitiveRegistry())

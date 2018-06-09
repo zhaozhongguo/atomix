@@ -20,26 +20,24 @@ import io.atomix.core.value.AtomicValueType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.KryoNamespace;
-import io.atomix.utils.serializer.KryoNamespaces;
 import io.atomix.utils.serializer.Serializer;
 
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Raft atomic value service.
  */
 public class DefaultAtomicValueService extends AbstractPrimitiveService<AtomicValueClient> implements AtomicValueService {
   private static final Serializer SERIALIZER = Serializer.using(KryoNamespace.builder()
-      .register(KryoNamespaces.BASIC)
-      .register(AtomicValueOperations.NAMESPACE)
-      .register(AtomicValueEvents.NAMESPACE)
+      .register((KryoNamespace) AtomicValueType.instance().namespace())
+      .register(SessionId.class)
       .build());
 
   private byte[] value;
-  private java.util.Set<PrimitiveSession> listeners = Sets.newHashSet();
+  private Set<SessionId> listeners = Sets.newHashSet();
 
   public DefaultAtomicValueService() {
     super(AtomicValueType.instance(), AtomicValueClient.class);
@@ -53,26 +51,19 @@ public class DefaultAtomicValueService extends AbstractPrimitiveService<AtomicVa
   @Override
   public void backup(BackupOutput writer) {
     writer.writeInt(value.length).writeBytes(value);
-    java.util.Set<Long> sessionIds = new HashSet<>();
-    for (PrimitiveSession session : listeners) {
-      sessionIds.add(session.sessionId().id());
-    }
-    writer.writeObject(sessionIds);
+    writer.writeObject(listeners);
   }
 
   @Override
   public void restore(BackupInput reader) {
     value = reader.readBytes(reader.readInt());
-    listeners = new HashSet<>();
-    for (Long sessionId : reader.<java.util.Set<Long>>readObject()) {
-      listeners.add(getSession(sessionId));
-    }
+    listeners = reader.readObject();
   }
 
   private byte[] updateAndNotify(byte[] value) {
     byte[] oldValue = this.value;
     this.value = value;
-    listeners.forEach(s -> acceptOn(s, client -> client.change(value, oldValue)));
+    listeners.forEach(session -> getSession(session).accept(client -> client.change(value, oldValue)));
     return oldValue;
   }
 
@@ -107,11 +98,11 @@ public class DefaultAtomicValueService extends AbstractPrimitiveService<AtomicVa
 
   @Override
   public void addListener() {
-    listeners.add(getCurrentSession());
+    listeners.add(getCurrentSession().sessionId());
   }
 
   @Override
   public void removeListener() {
-    listeners.remove(getCurrentSession());
+    listeners.remove(getCurrentSession().sessionId());
   }
 }

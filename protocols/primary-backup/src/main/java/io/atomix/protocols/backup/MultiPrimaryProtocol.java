@@ -22,10 +22,11 @@ import io.atomix.primitive.Replication;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.proxy.PartitionProxy;
-import io.atomix.primitive.proxy.PrimitiveProxy;
-import io.atomix.primitive.proxy.impl.PartitionedPrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.primitive.proxy.impl.DefaultProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
+import io.atomix.primitive.session.SessionClient;
+import io.atomix.protocols.backup.partition.PrimaryBackupPartition;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -99,21 +100,21 @@ public class MultiPrimaryProtocol implements PrimitiveProtocol {
   }
 
   @Override
-  public PrimitiveProxy newProxy(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig, PartitionService partitionService) {
-    Collection<PartitionProxy> partitions = partitionService.getPartitionGroup(this)
+  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, ServiceConfig serviceConfig, PartitionService partitionService) {
+    Collection<SessionClient> partitions = partitionService.getPartitionGroup(this)
         .getPartitions()
         .stream()
-        .map(partition -> ((PrimaryBackupClient) partition.getProxyClient()).proxyBuilder(primitiveName, primitiveType, serviceConfig)
+        .map(partition -> ((PrimaryBackupPartition) partition).getClient()
+            .sessionBuilder(primitiveName, primitiveType, serviceConfig)
             .withConsistency(config.getConsistency())
             .withReplication(config.getReplication())
             .withRecovery(config.getRecovery())
             .withNumBackups(config.getBackups())
             .withMaxRetries(config.getMaxRetries())
             .withRetryDelay(config.getRetryDelay())
-            .withExecutor(config.getExecutor())
             .build())
         .collect(Collectors.toList());
-    return new PartitionedPrimitiveProxy(primitiveName, primitiveType, partitions, config.getPartitioner());
+    return new DefaultProxyClient<>(primitiveName, primitiveType, serviceType, partitions, config.getPartitioner());
   }
 
   @Override
@@ -240,8 +241,8 @@ public class MultiPrimaryProtocol implements PrimitiveProtocol {
      * @return The proxy builder.
      * @throws NullPointerException if the executor is null
      */
+    @Deprecated
     public Builder withExecutor(Executor executor) {
-      config.setExecutor(executor);
       return this;
     }
 

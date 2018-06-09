@@ -31,7 +31,7 @@ import io.atomix.primitive.Ordering;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.BackupInput;
 import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.PrimitiveSession;
+import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.KryoNamespace;
 import io.atomix.utils.serializer.Serializer;
@@ -266,16 +266,16 @@ public class DefaultDocumentTreeService extends AbstractPrimitiveService<Documen
     listeners.entrySet()
         .stream()
         .filter(e -> event.path().isDescendentOf(e.getValue().leastCommonAncestorPath()))
-        .forEach(e -> acceptOn(e.getKey(), client -> client.change(event)));
+        .forEach(e -> getSession(e.getKey()).accept(client -> client.change(event)));
   }
 
   @Override
-  public void onExpire(PrimitiveSession session) {
+  public void onExpire(Session session) {
     closeListener(session.sessionId());
   }
 
   @Override
-  public void onClose(PrimitiveSession session) {
+  public void onClose(Session session) {
     closeListener(session.sessionId());
   }
 

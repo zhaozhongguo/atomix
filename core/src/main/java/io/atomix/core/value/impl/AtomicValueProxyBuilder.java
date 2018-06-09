@@ -19,7 +19,7 @@ import io.atomix.core.value.AtomicValue;
 import io.atomix.core.value.AtomicValueBuilder;
 import io.atomix.core.value.AtomicValueConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
 
@@ -38,9 +38,10 @@ public class AtomicValueProxyBuilder<V> extends AtomicValueBuilder<V> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicValue<V>> buildAsync() {
-    PrimitiveProxy proxy = protocol().newProxy(
+    ProxyClient<AtomicValueService> proxy = protocol().newProxy(
         name(),
         primitiveType(),
+        AtomicValueService.class,
         new ServiceConfig(),
         managementService.getPartitionService());
     return new AtomicValueProxy(proxy, managementService.getPrimitiveRegistry())
